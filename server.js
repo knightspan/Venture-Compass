@@ -2,7 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const path = require('path');
-const { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } = require('@google/generative-ai');
+const OpenAI = require('openai');
 const rateLimit = require('express-rate-limit');
 
 dotenv.config();
@@ -32,51 +32,39 @@ const oracleLimiter = rateLimit({
 app.use('/api/', apiLimiter);
 app.use('/api/oracle', oracleLimiter);
 
-// ─── Gemini Setup ─────────────────────────────────────────────────────────────
-if (!process.env.GEMINI_API_KEY) {
-  console.warn('⚠️  GEMINI_API_KEY is missing from .env — API calls will fail');
+// ─── OpenAI Setup ─────────────────────────────────────────────────────────────
+if (!process.env.OPENAI_API_KEY) {
+  console.warn('⚠️  OPENAI_API_KEY is missing from .env — API calls will fail');
 }
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY);
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+});
 
-const safetySettings = [
-  { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
-  { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE },
-];
-
-const generationConfig = {
-  temperature: 0.8,
-  topP: 0.95,
-  topK: 40,
-  maxOutputTokens: 2048,
-};
-
-const chatConfig = {
-  temperature: 0.9,
-  topP: 0.95,
-  topK: 40,
-  maxOutputTokens: 1024,
-};
-
-// Model with fallback
-function getModel(modelName = 'gemini-2.5-flash', useChat = false) {
-  const cfg = useChat ? chatConfig : generationConfig;
-  return genAI.getGenerativeModel({ model: modelName, safetySettings, generationConfig: cfg });
-}
-
-async function generateWithFallback(prompt) {
-  const models = ['gemini-2.5-flash', 'gemini-2.0-flash', 'gemini-2.0-flash-lite'];
+async function generateCompletion(prompt, isJson = false) {
+  const models = ['gpt-4o-mini', 'gpt-4o'];
   let lastError;
+
   for (const modelName of models) {
     try {
-      const model = getModel(modelName);
-      const result = await model.generateContent(prompt);
-      const text = result.response.text();
-      if (!text) throw new Error('Empty response from model');
-      console.log(`✅  Used model: ${modelName}`);
+      const options = {
+        model: modelName,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: isJson ? 0.7 : 0.8,
+      };
+
+      if (isJson) {
+        options.response_format = { type: 'json_object' };
+      }
+
+      const response = await openai.chat.completions.create(options);
+      const text = response.choices[0]?.message?.content;
+      
+      if (!text) throw new Error('Empty response from OpenAI');
+      console.log(`✅ Used OpenAI model: ${modelName}`);
       return text;
     } catch (err) {
-      console.warn(`⚠️  Model ${modelName} failed: ${err.message}`);
+      console.warn(`⚠️ Model ${modelName} failed: ${err.message}`);
       lastError = err;
     }
   }
@@ -87,25 +75,11 @@ async function generateWithFallback(prompt) {
 const cleanJsonResponse = (text) => {
   let cleaned = text.trim();
 
-  // If the model wrapped the whole JSON in quotes (double-encoded), unwrap it
-  if (cleaned.startsWith('"') && cleaned.endsWith('"')) {
-    try {
-      cleaned = JSON.parse(cleaned); // unwrap the outer string
-    } catch (e) { /* ignore */ }
-  }
-
-  // Strip markdown fences
+  // Strip markdown fences if OpenAI returned them despite json_object mode
   cleaned = cleaned
     .replace(/```json\s*/gi, '')
     .replace(/```\s*/gi, '')
     .trim();
-
-  // Extract just the JSON object (find first { to last })
-  const firstBrace = cleaned.indexOf('{');
-  const lastBrace = cleaned.lastIndexOf('}');
-  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-    cleaned = cleaned.slice(firstBrace, lastBrace + 1);
-  }
 
   return cleaned;
 };
@@ -118,7 +92,7 @@ const cleanJsonResponse = (text) => {
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'operational',
-    model: 'gemini-2.5-flash',
+    model: 'gpt-4o-mini',
     timestamp: new Date().toISOString()
   });
 });
@@ -136,7 +110,6 @@ app.post('/api/recommend', async (req, res) => {
   const prompt = `
 You are VentureCompass — a brutally honest, India-savvy startup strategist. 
 Analyze this founder's profile and return ONLY valid JSON.
-CRITICAL: Return raw JSON only. No markdown. No code fences. No backticks. No explanation before or after.
 CRITICAL: In JSON string values, use \\n to represent line breaks (not actual newlines).
 
 FOUNDER PROFILE:
@@ -182,28 +155,13 @@ Return this EXACT JSON structure with no deviation:
 `;
 
   try {
-    const responseText = await generateWithFallback(prompt);
+    const responseText = await generateCompletion(prompt, true);
     const cleanedText = cleanJsonResponse(responseText);
 
-    let parsed;
-    try {
-      parsed = JSON.parse(cleanedText);
-    } catch (parseErr) {
-      // Model included literal newlines inside JSON string values — escape them
-      const oneLiner = cleanedText
-        .replace(/\r\n/g, '\\n')
-        .replace(/\r/g, '\\n')
-        .replace(/\n/g, '\\n');
-      parsed = JSON.parse(oneLiner);
-    }
+    const parsed = JSON.parse(cleanedText);
 
     if (!parsed.primary || !parsed.primary.model || !parsed.alternatives) {
       throw new Error('Invalid response structure from AI');
-    }
-
-    // Restore newlines in rationale for paragraph splitting on frontend
-    if (parsed.primary.rationale) {
-      parsed.primary.rationale = parsed.primary.rationale.replace(/\\n/g, '\n');
     }
 
     res.json(parsed);
@@ -211,14 +169,14 @@ Return this EXACT JSON structure with no deviation:
     console.error('❌ /api/recommend error:', err.message);
 
     // Classify error for frontend
-    const isApiKeyError = err.message?.includes('API_KEY') || err.message?.includes('400') || err.message?.includes('401');
-    const isQuotaError = err.message?.includes('429') || err.message?.includes('quota');
+    const isApiKeyError = err.message?.includes('API_KEY') || err.message?.includes('401') || err.status === 401;
+    const isQuotaError = err.message?.includes('429') || err.message?.includes('quota') || err.status === 429;
 
     res.status(500).json({
       error: isApiKeyError
-        ? 'API key is invalid or not authorized. Please set a valid GEMINI_API_KEY in .env'
+        ? 'API key is invalid or not authorized. Please set a valid OPENAI_API_KEY.'
         : isQuotaError
-          ? 'Gemini API quota exceeded. Please wait a moment and try again.'
+          ? 'OpenAI API quota exceeded. Please wait a moment and try again.'
           : 'The Oracle failed to respond. Please try again.',
       debug: process.env.NODE_ENV === 'development' ? err.message : undefined,
       fallback: getFallbackRecommendation(answers)
@@ -227,7 +185,7 @@ Return this EXACT JSON structure with no deviation:
 });
 
 /**
- * Oracle chat endpoint — with streaming support
+ * Oracle chat endpoint
  */
 app.post('/api/oracle', async (req, res) => {
   const { message, context, history } = req.body;
@@ -251,25 +209,36 @@ Rules:
 - Keep responses under 300 words unless the question demands more.
 - Never say "As an AI..." or hedge excessively. You are the Oracle. You speak truth.`;
 
-  // Build conversation history for multi-turn
-  const chatHistory = (history || []).map(msg => ({
-    role: msg.role,
-    parts: [{ text: msg.content }]
-  }));
+  // Map frontend history to OpenAI format
+  // Frontend: [{ role: 'user'|'model', content: '...' }]
+  const mappedMessages = [
+    { role: 'system', content: systemContext }
+  ];
+
+  if (history && Array.isArray(history)) {
+    history.forEach(msg => {
+      mappedMessages.push({
+        role: msg.role === 'model' ? 'assistant' : 'user',
+        content: msg.content
+      });
+    });
+  }
+
+  // Add the new message
+  mappedMessages.push({ role: 'user', content: message });
 
   try {
-    const model = getModel('gemini-2.5-flash', true);
-    const chat = model.startChat({
-      history: chatHistory,
-      systemInstruction: systemContext,
+    const response = await openai.chat.completions.create({
+      model: 'gpt-4o-mini',
+      messages: mappedMessages,
+      temperature: 0.8,
+      max_tokens: 800
     });
 
-    const result = await chat.sendMessage(message);
-    const reply = result.response.text();
-
+    const reply = response.choices[0]?.message?.content;
     if (!reply) throw new Error('Empty response from Oracle');
 
-    res.json({ reply, model: 'gemini-2.5-flash' });
+    res.json({ reply, model: 'gpt-4o-mini' });
   } catch (err) {
     console.error('❌ /api/oracle error:', err.message);
     res.status(500).json({
@@ -290,7 +259,7 @@ app.post('/api/insights', async (req, res) => {
   }
 
   const prompt = `
-You are a precise Indian e-commerce market analyst. Return ONLY valid JSON for the "${modelKey}" business model in India (2024-25 data). No markdown, no backticks.
+You are a precise Indian e-commerce market analyst. Return ONLY valid JSON for the "${modelKey}" business model in India (2024-25 data).
 
 {
   "marketSize": "Specific market size with source reference (e.g. '$X Billion by 202X, IBEF/Statista')",
@@ -304,7 +273,7 @@ You are a precise Indian e-commerce market analyst. Return ONLY valid JSON for t
 `;
 
   try {
-    const responseText = await generateWithFallback(prompt);
+    const responseText = await generateCompletion(prompt, true);
     const parsed = JSON.parse(cleanJsonResponse(responseText));
     res.json(parsed);
   } catch (err) {
@@ -330,7 +299,7 @@ app.post('/api/snapshot', (req, res) => {
     timestamp: timestamp || new Date().toISOString(),
     recommendation: result,
     profile: answers,
-    generatedBy: 'VentureCompass v2.0 · Gemini 2.0 Flash'
+    generatedBy: 'VentureCompass v2.0 · OpenAI GPT-4o-mini'
   };
 
   res.json(snapshot);
@@ -343,7 +312,7 @@ function getFallbackRecommendation(answers) {
       model: 'Direct-to-Consumer (D2C)',
       matchScore: 82,
       tagline: 'Own your customer, own your margin — the Indian brand playbook.',
-      rationale: 'D2C is the dominant growth model in India right now, with brands like Mamaearth, BoAt, and Sugar Cosmetics proving that category disruption is possible even against entrenched incumbents. The UPI infrastructure and social commerce explosion via Instagram and WhatsApp have dramatically lowered the customer acquisition cost floor.\n\nFor your profile, D2C aligns well because it gives you control over brand narrative, pricing, and customer data from day one. The margin structure — typically 45-70% gross — allows reinvestment into growth without burning through capital at the rate that marketplace models demand.\n\nThe Indian market in 2025 rewards niche focus. Attempting to be everything to everyone burns runway fast. Pick one customer cohort, solve one specific pain point better than anyone else, and own that before expanding.',
+      rationale: 'D2C is the dominant growth model in India right now, with brands like Mamaearth, BoAt, and Sugar Cosmetics proving that category disruption is possible even against entrenched incumbents. The UPI infrastructure and social commerce explosion via Instagram and WhatsApp have dramatically lowered the customer acquisition cost floor.\n\nFor your profile, D2C aligns well because it gives you control over brand narrative, pricing, and customer data from day one. The margin structure — typically 45-70% gross — allows reinvestment into growth without burning through capital at the rate that marketplace models demand.\n\nThe Indian market rewards niche focus. Attempting to be everything to everyone burns runway fast. Pick one customer cohort, solve one specific pain point better than anyone else, and own that before expanding.',
       immediateActions: [
         'Validate your niche with 50 WhatsApp conversations before building anything',
         'Launch a Shopify store with Razorpay in under 48 hours — test one hero product',
@@ -373,8 +342,8 @@ app.use('/api/*', (req, res) => {
 
 // ─── Start ───────────────────────────────────────────────────────────────────
 app.listen(port, () => {
-  console.log(`\n◈ VentureCompass v2.0`);
+  console.log(`\n◈ VentureCompass v2.0 (OpenAI Engine)`);
   console.log(`◈ Backend active on http://localhost:${port}`);
-  console.log(`◈ Gemini API: ${process.env.GEMINI_API_KEY ? '✅ Key loaded' : '❌ MISSING KEY'}`);
-  console.log(`◈ Model: gemini-2.5-flash → 2.0-flash → 2.0-flash-lite (fallback chain)\n`);
+  console.log(`◈ OpenAI API: ${process.env.OPENAI_API_KEY ? '✅ Key loaded' : '❌ MISSING KEY'}`);
+  console.log(`◈ Primary Model: gpt-4o-mini (with fallback chain)\n`);
 });
