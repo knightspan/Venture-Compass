@@ -1,0 +1,16 @@
+# Dependencies
+node_modules/
+
+# Environment — never commit real API keys
+.env
+
+# Debug scripts
+debug_json.js
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*

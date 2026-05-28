@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VentureCompass | AI Startup Planner</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700;900&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+  
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <!-- Grain Overlay -->
+  <div class="grain-overlay"></div>
+
+  <!-- Loading Screen -->
+  <div id="loader">
+    <div class="loader-content">
+      <h1 class="loader-logo">◈ VentureCompass</h1>
+      <div class="progress-bar-container">
+        <div class="progress-bar"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Custom Cursor -->
+  <div id="cursor-dot"></div>
+  <div id="cursor-ring"></div>
+  
+  <!-- TICKER -->
+  <div id="ticker">
+    <div class="ticker-content">
+      <span>SUBSCRIPTION · MARGIN 40–70% · ₹50K–₹3L</span> <span class="gold-sep">◈</span> 
+      <span>DROPSHIPPING · FASTEST TO REVENUE · ₹10K–₹50K</span> <span class="gold-sep">◈</span> 
+      <span>D2C · BRAND EQUITY · 45–75% MARGIN</span> <span class="gold-sep">◈</span> 
+      <span>MARKETPLACE · NETWORK EFFECTS · ₹5L+</span> <span class="gold-sep">◈</span> 
+      <span>SAAS · HIGH LTV · ₹2L–₹10L</span> <span class="gold-sep">◈</span> 
+      <span>FREEMIUM · SCALE FIRST · ₹10L+</span> <span class="gold-sep">◈</span> 
+      <span>AFFILIATE · ZERO INVENTORY · < ₹25K</span> <span class="gold-sep">◈</span> 
+      <span>WHITE LABEL · FAST GTM · ₹1L–₹5L</span> <span class="gold-sep">◈</span> 
+      <!-- Duplicate for infinite scroll seamlessness -->
+      <span>SUBSCRIPTION · MARGIN 40–70% · ₹50K–₹3L</span> <span class="gold-sep">◈</span> 
+      <span>DROPSHIPPING · FASTEST TO REVENUE · ₹10K–₹50K</span> <span class="gold-sep">◈</span> 
+      <span>D2C · BRAND EQUITY · 45–75% MARGIN</span> <span class="gold-sep">◈</span> 
+      <span>MARKETPLACE · NETWORK EFFECTS · ₹5L+</span> <span class="gold-sep">◈</span> 
+      <span>SAAS · HIGH LTV · ₹2L–₹10L</span> <span class="gold-sep">◈</span> 
+      <span>FREEMIUM · SCALE FIRST · ₹10L+</span> <span class="gold-sep">◈</span> 
+      <span>AFFILIATE · ZERO INVENTORY · < ₹25K</span> <span class="gold-sep">◈</span> 
+      <span>WHITE LABEL · FAST GTM · ₹1L–₹5L</span> <span class="gold-sep">◈</span>
+    </div>
+  </div>
+  
+  <!-- NAV -->
+  <nav id="nav">
+    <div class="nav-left">◈ VentureCompass</div>
+    <div class="nav-center">
+      <a href="#planner">Planner</a> · 
+      <a href="#compare">Compare</a> · 
+      <a href="#charts">Charts</a> · 
+      <a href="#oracle">Oracle</a> · 
+      <a href="#explorer">Explorer</a>
+    </div>
+    <div class="nav-right">
+      <button class="btn-ghost-small" onclick="scrollToPlanner()">FIND YOUR MODEL &rarr;</button>
+    </div>
+    <div class="hamburger">☰</div>
+  </nav>
+  
+  <main>
+    <!-- HERO -->
+    <section id="hero">
+      <div class="roman-numeral-bg">I</div>
+      <canvas id="particles"></canvas>
+      <div class="hero-content reveal">
+        <p class="eyebrow">E-COMMERCE INTELLIGENCE PLATFORM</p>
+        <h1 class="hero-title">VENTURE<br><span class="gold-text">COMPASS</span></h1>
+        <p class="hero-subtitle" id="typewriter-text"></p>
+        <div class="hero-ctas">
+          <button class="btn-primary" onclick="scrollToPlanner()">BEGIN ASSESSMENT &rarr;</button>
+          <button class="btn-ghost" onclick="scrollToExplorer()">EXPLORE MODELS</button>
+        </div>
+        <div class="gold-rule"></div>
+        <div class="hero-stats">
+          <div class="stat"><span class="stat-num">8</span><br><span class="stat-label">Models</span></div>
+          <div class="stat"><span class="stat-num">12</span><br><span class="stat-label">Dimensions</span></div>
+          <div class="stat"><span class="stat-num">AI</span><br><span class="stat-label">Gemini 1.5</span></div>
+          <div class="stat"><span class="stat-num">0</span><br><span class="stat-label">Backend Latency*</span></div>
+        </div>
+        <p class="footnote">*proxied via local Express server</p>
+      </div>
+    </section>
+    
+    <!-- PLANNER -->
+    <section id="planner">
+      <div class="planner-container">
+        <div class="planner-left">
+          <div class="progress-indicator" id="progress-indicator">
+            <!-- Filled by JS -->
+          </div>
+          <div class="watermark" id="question-watermark">I / VII</div>
+          <div class="session-profile" id="session-profile">
+            <!-- Tags populated by JS -->
+          </div>
+        </div>
+        <div class="planner-right">
+          <div class="question-container" id="question-container">
+            <h2 class="question-text" id="question-text">Loading question...</h2>
+            <div class="options-grid" id="options-grid">
+              <!-- Options populated by JS -->
+            </div>
+            <div class="planner-controls">
+              <button class="btn-ghost" id="btn-back" style="display:none;">&larr; BACK</button>
+              <button class="btn-primary" id="btn-submit" style="display:none;">CONSULT THE ORACLE &rarr;</button>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+      <!-- Consulting Oracle Loading Overlay -->
+      <div id="consulting-loader" style="display:none;">
+        <div class="compass-spinner">
+          <svg viewBox="0 0 100 100" width="80" height="80">
+            <circle cx="50" cy="50" r="45" fill="none" stroke="var(--gold-muted)" stroke-width="2"/>
+            <path d="M50 10 L60 40 L90 50 L60 60 L50 90 L40 60 L10 50 L40 40 Z" fill="var(--gold)" opacity="0.8"/>
+            <circle cx="50" cy="50" r="5" fill="var(--void)"/>
+          </svg>
+        </div>
+        <p class="consulting-text">Consulting the Oracle...</p>
+        <p class="consulting-subtext">Analysing your profile against 8 business models...</p>
+      </div>
+    </section>
+    
+    <!-- RESULTS -->
+    <section id="results" style="display:none;">
+      <div class="results-container reveal">
+        <div class="oracle-verdict-card">
+          <div class="verdict-header">
+            <span class="verdict-label">ORACLE VERDICT</span>
+            <div class="match-score-badge">
+              <span class="score-val" id="res-score">--</span>
+              <span class="score-lbl">MATCH</span>
+            </div>
+          </div>
+          <h2 class="res-model-name" id="res-model">Model Name</h2>
+          <p class="res-tagline" id="res-tagline">Tagline...</p>
+          <div class="res-rationale" id="res-rationale"></div>
+          
+          <div class="res-grid">
+            <div class="res-section">
+              <h3 class="section-divider-title"><span>IMMEDIATE ACTIONS</span></h3>
+              <ul class="action-list" id="res-actions"></ul>
+            </div>
+            <div class="res-section">
+              <h3 class="section-divider-title"><span>RED FLAGS</span></h3>
+              <ul class="flag-list" id="res-flags"></ul>
+            </div>
+          </div>
+          
+          <div class="res-section">
+            <h3 class="section-divider-title"><span>INDIAN EXAMPLES</span></h3>
+            <div class="examples-row" id="res-examples"></div>
+          </div>
+          
+          <div class="metrics-row">
+            <div class="metric-pill"><span class="lbl">TIMELINE:</span> <span class="val" id="res-timeline">--</span></div>
+            <div class="metric-pill"><span class="lbl">CAPITAL:</span> <span class="val" id="res-capital">--</span></div>
+          </div>
+        </div>
+
+        <div class="alternatives-section">
+          <h3 class="section-title">ALTERNATIVE PATHS</h3>
+          <div class="alt-grid" id="res-alternatives"></div>
+        </div>
+
+        <div class="warning-card">
+          <div class="warning-header">⚠ THE ORACLE WARNS</div>
+          <p id="res-warning">Warning text...</p>
+        </div>
+
+        <div class="res-summary-bar" id="res-summary"></div>
+
+        <div class="center-action">
+          <button class="btn-ghost" id="btn-copy-result">COPY RESULT</button>
+          <button class="btn-primary" onclick="scrollToOracle()">ASK THE ORACLE &rarr;</button>
+        </div>
+      </div>
+    </section>
+    
+    <!-- ORACLE -->
+    <section id="oracle" style="display:none;">
+      <div class="oracle-container reveal">
+        <div class="oracle-left">
+          <h3 class="oracle-panel-title">Context</h3>
+          <div class="oracle-context-card">
+            <div class="context-label">Your Recommendation</div>
+            <div class="context-value gold-text" id="oracle-model-name">--</div>
+            <div class="context-label mt-4">Your Profile</div>
+            <div class="oracle-profile-tags" id="oracle-profile"></div>
+            <div class="context-label mt-4">Session Started</div>
+            <div class="context-value" id="oracle-time">--</div>
+          </div>
+        </div>
+        <div class="oracle-right">
+          <div class="chat-window" id="chat-window">
+            <div class="chat-msg ai-msg">
+              <div class="msg-content">Greetings, founder. The Oracle is ready. What do you wish to know about your strategic path?</div>
+            </div>
+          </div>
+          <div class="starter-chips" id="starter-chips">
+            <button class="chip" onclick="sendOracleMessage('What should I do in my first 30 days?')">What should I do in my first 30 days?</button>
+            <button class="chip" onclick="sendOracleMessage('What are the biggest risks in India for this model?')">Biggest risks in India?</button>
+            <button class="chip" onclick="sendOracleMessage('How much money do I need to start?')">How much money to start?</button>
+          </div>
+          <div class="chat-input-area">
+            <input type="text" id="chat-input" placeholder="Ask the Oracle anything...">
+            <button class="btn-send" id="btn-send-chat">SEND &rarr;</button>
+          </div>
+        </div>
+      </div>
+    </section>
+    
+    <!-- COMPARE -->
+    <section id="compare">
+      <div class="section-header reveal">
+        <h2>THE ARENA</h2>
+        <p>Eight models. Eight dimensions. No flattery.</p>
+        <div class="gold-rule center-rule"></div>
+      </div>
+      <div class="table-container reveal">
+        <table id="compare-table">
+          <thead>
+            <tr>
+              <th class="sticky-col">MODEL</th>
+              <th>CAPITAL REQ</th>
+              <th>TIME TO REV</th>
+              <th>TECH DEMAND</th>
+              <th>RISK LEVEL</th>
+              <th>SCALE CEILING</th>
+              <th>CUSTOMER LTV</th>
+              <th>MARGIN POTENTIAL</th>
+            </tr>
+          </thead>
+          <tbody id="compare-body">
+            <!-- Populated by JS -->
+          </tbody>
+        </table>
+        <p class="table-legend">◈ Highlighted row = Your AI Recommendation</p>
+      </div>
+    </section>
+    
+    <!-- CHARTS -->
+    <section id="charts">
+      <div class="charts-grid reveal">
+        <div class="chart-card">
+          <h3 class="chart-title">The Risk-Return Battlefield</h3>
+          <div class="canvas-container">
+            <canvas id="scatterChart"></canvas>
+          </div>
+        </div>
+        <div class="chart-card">
+          <h3 class="chart-title">The Velocity Matrix</h3>
+          <div class="velocity-container" id="velocity-matrix">
+            <!-- Custom HTML bars populated by JS -->
+          </div>
+        </div>
+        <div class="chart-card full-width">
+          <h3 class="chart-title">The Capability Constellation</h3>
+          <div class="radar-controls">
+            <select id="radar-model-1" disabled><option>Your Recommendation</option></select>
+            <span class="vs">VS</span>
+            <select id="radar-model-2">
+              <!-- Populated by JS -->
+            </select>
+          </div>
+          <div class="canvas-container-large">
+            <canvas id="radarChart"></canvas>
+          </div>
+        </div>
+      </div>
+    </section>
+    
+    <!-- EXPLORER -->
+    <section id="explorer">
+      <div class="section-header reveal">
+        <h2>MODEL EXPLORER</h2>
+        <p>Deep dives into the mechanics of each architecture.</p>
+        <div class="gold-rule center-rule"></div>
+      </div>
+      <div class="masonry-grid reveal" id="explorer-grid">
+        <!-- Cards populated by JS -->
+      </div>
+    </section>
+  </main>
+  
+  <footer>
+    <div class="footer-top">
+      <div class="footer-left">
+        <div class="footer-logo">VENTURECOMPASS</div>
+        <div class="footer-tagline">An AI-powered instrument for startup clarity.</div>
+      </div>
+      <div class="footer-right">
+        <div>Powered by Gemini 2.0 Flash · Built with Node.js + Express</div>
+        <div>Mini Project 5 · E-Business Fundamentals · SPPU 2024 Pattern</div>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <div class="gold-rule"></div>
+      <div class="footer-end">◈ FIND YOUR TRUE BUSINESS NORTH ◈</div>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
